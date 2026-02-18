@@ -1,0 +1,28 @@
+{
+  "name": "@cappee/amex-actual-importer",
+  "version": "1.0.0",
+  "description": "Standalone service: syncs Amex Italia transactions to Actual Budget via @actual-app/api",
+  "license": "ISC",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "amex-actual-importer": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@actual-app/api": "^26.2.0",
+    "dotenv": "^17.2.4",
+    "imap": "^0.8.17",
+    "patchright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/imap": "^0.8.40",
+    "@types/node": "^25.2.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
