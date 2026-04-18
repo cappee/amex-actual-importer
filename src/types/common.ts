@@ -20,6 +20,7 @@ export interface SyncResult {
   success: boolean;
   transactionsFound: number;
   transactionsImported: number;
+  transactionsUpdated: number;
   transactionsSkipped: number;
   durationMs: number;
   error: string | null;

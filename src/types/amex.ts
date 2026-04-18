@@ -10,7 +10,19 @@ export interface AmexTransaction {
   type: 'DEBIT' | 'CREDIT';
   chargeDate: string;
   postDate: string;
+  status: 'posted' | 'pending';
   merchantName: string;
+  merchantAddress?: {
+    city?: string;
+    country?: string;
+    countryName?: string;
+  };
+  walletProvider?: string;
+  foreignDetails?: {
+    amount?: number;
+    currency?: string;
+    exchangeRate?: number;
+  };
 }
 
 /** Response to the first POST /login */
@@ -65,7 +77,24 @@ export interface TransactionsApiResponse {
     charge_date: string;
     post_date: string;
     extended_details?: {
-      merchant?: { name?: string };
+      merchant?: {
+        name?: string;
+        address?: {
+          city?: string;
+          country?: string;
+          country_name?: string;
+        };
+      };
+      additional_attributes?: {
+        wallet_provider?: string;
+      };
+    };
+    foreign_details?: {
+      amount?: number;
+      iso_alpha_currency_code?: string;
+      currency?: string;
+      exchange_rate?: number;
+      conversion_rate?: number;
     };
   }>;
 }

@@ -9,10 +9,12 @@ export interface ActualTransaction {
   amount: number;
   imported_id: string;
   notes?: string;
+  cleared?: boolean;
 }
 
 /** Result of an import operation */
 export interface ImportResult {
   imported: number;
   skipped: number;
+  updated: number;
 }
