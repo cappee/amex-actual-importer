@@ -3,18 +3,48 @@
   "version": "2.0.0",
   "description": "Standalone service: syncs Amex Italia transactions to Actual Budget via @actual-app/api",
   "license": "ISC",
+  "author": "Gabriele Cappellaro",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "src/index.js",
+  "main": "dist/src/index.js",
+  "bin": {
+    "amex-actual-importer": "dist/src/index.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cappee/amex-actual-importer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cappee/amex-actual-importer/issues"
+  },
+  "homepage": "https://github.com/cappee/amex-actual-importer#readme",
+  "keywords": [
+    "amex",
+    "actual-budget",
+    "actual",
+    "sync",
+    "importer",
+    "italia"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "tsc --noCheck",
+    "start": "node dist/src/index.js",
     "dev": "tsx src/index.ts",
     "test": "tsx --test test/**/*.test.ts",
     "encrypt": "tsx scripts/encrypt-credential.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@actual-app/api": "^26.2.0",

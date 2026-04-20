@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // ---------------------------------------------------------------------------
 // Entry point: bootstrap, run sync, and clean up.
 //
