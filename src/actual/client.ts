@@ -1,88 +1,110 @@
-import fs from 'fs';
+// ---------------------------------------------------------------------------
+// Wrapper around @actual-app/api for importing transactions.
+// ---------------------------------------------------------------------------
 
-import * as actualApi from '@actual-app/api';
+import * as api from '@actual-app/api';
+import type { Config } from '../config/schema.js';
+import type { Logger } from '../lib/logger.js';
+import { ActualError } from '../lib/errors.js';
+import type { ActualTransaction, ImportResult } from '../types/actual.js';
 
-import { config } from '../config.js';
-import { log } from '../logger.js';
-
-import type { ActualTransaction } from './mapper.js';
-
-let initialized = false;
-
-/**
- * Initialize the Actual API connection (idempotent).
- */
-export async function initActual(): Promise<void> {
-  if (initialized) return;
-
-  const { serverURL, password, syncId, encryptionPassword, dataDir } = config.actual;
-
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  log.info('Connecting to Actual server at %s (dataDir: %s)...', serverURL, dataDir);
-
-  await actualApi.init({
-    dataDir,
-    serverURL,
-    password,
-  });
-
-  log.info('Downloading budget %s...', syncId);
-  if (encryptionPassword) {
-    await actualApi.downloadBudget(syncId, { password: encryptionPassword });
-  } else {
-    await actualApi.downloadBudget(syncId);
-  }
-
-  initialized = true;
-  log.info('Actual API initialized');
+interface ActualClientDeps {
+  config: Readonly<Config>;
+  logger: Logger;
 }
 
-/**
- * Import transactions using importTransactions (deduplicates via imported_id).
- * Returns the count of actually-new transactions inserted.
- */
-export async function importTransactions(
-  actualAccountId: string,
-  transactions: ActualTransaction[],
-): Promise<{ added: number; updated: number }> {
-  if (transactions.length === 0) {
-    return { added: 0, updated: 0 };
+export class ActualClient {
+  private readonly config: Readonly<Config>;
+  private readonly logger: Logger;
+  private connected = false;
+
+  constructor(deps: ActualClientDeps) {
+    this.config = deps.config;
+    this.logger = deps.logger;
   }
 
-  log.info(
-    'Importing %d transactions into Actual account %s...',
-    transactions.length,
-    actualAccountId,
-  );
+  async connect(): Promise<void> {
+    try {
+      await api.init({
+        serverURL: this.config.actual.serverUrl,
+        password: this.config.actual.password,
+      });
+      await api.downloadBudget(this.config.actual.budgetId);
+      this.connected = true;
+      this.logger.info('Actual Budget: connected and budget loaded');
+    } catch (err) {
+      throw new ActualError('Failed to connect to Actual Budget', { cause: err as Error });
+    }
+  }
 
-  // importTransactions deduplicates by imported_id automatically
-  const result = await actualApi.importTransactions(actualAccountId, transactions);
+  async importTransactions(transactions: ActualTransaction[]): Promise<ImportResult> {
+    if (!this.connected) {
+      throw new ActualError('Not connected — call connect() first');
+    }
 
-  log.info(
-    'Import result: added=%d, updated=%d',
-    result.added?.length ?? 0,
-    result.updated?.length ?? 0,
-  );
+    try {
+      const accountId = this.config.actual.accountId;
+      const withAccount = transactions.map((t) => ({ ...t, account: accountId }));
+      const result = await api.importTransactions(accountId, withAccount);
+      const imported = (result as { added?: string[] })?.added?.length ?? 0;
+      const skipped = transactions.length - imported;
 
-  return {
-    added: result.added?.length ?? 0,
-    updated: result.updated?.length ?? 0,
-  };
-}
+      // Update pending→posted: find existing transactions that are now cleared
+      const updated = await this.updateClearedStatus(transactions);
 
-/**
- * Gracefully close the Actual API connection.
- */
-export async function shutdownActual(): Promise<void> {
-  if (!initialized) return;
-  try {
-    await actualApi.shutdown();
-    initialized = false;
-    log.info('Actual API shut down');
-  } catch (err) {
-    log.warn('Error shutting down Actual API: %s', err);
+      this.logger.info(
+        `Actual Budget: imported ${imported} new, ${skipped} duplicates, ${updated} updated pending→posted`,
+      );
+
+      if (imported > 0 || updated > 0) {
+        await api.sync();
+        this.logger.info('Actual Budget: synced to server');
+      }
+
+      return { imported, skipped, updated };
+    } catch (err) {
+      throw new ActualError('Failed to import transactions', { cause: err as Error });
+    }
+  }
+
+  private async updateClearedStatus(transactions: ActualTransaction[]): Promise<number> {
+    const accountId = this.config.actual.accountId;
+
+    // Get date range from transactions for the query
+    const dates = transactions.map((t) => t.date).sort();
+    if (dates.length === 0) return 0;
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+
+    const existing = await api.getTransactions(accountId, startDate, endDate);
+    const existingByImportId = new Map<string, { id: string; cleared: boolean }>();
+    for (const t of existing) {
+      if (t.imported_id) {
+        existingByImportId.set(t.imported_id, { id: t.id, cleared: t.cleared });
+      }
+    }
+
+    let updated = 0;
+    for (const txn of transactions) {
+      if (!txn.cleared) continue; // only upgrade to cleared
+      const match = existingByImportId.get(txn.imported_id);
+      if (match && !match.cleared) {
+        await api.updateTransaction(match.id, { cleared: true });
+        updated++;
+      }
+    }
+
+    return updated;
+  }
+
+  async close(): Promise<void> {
+    if (this.connected) {
+      try {
+        await api.shutdown();
+      } catch {
+        // Idempotent — ignore errors during cleanup
+      }
+      this.connected = false;
+    }
   }
 }
