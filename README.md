@@ -1,10 +1,8 @@
-# amex-actual-importer v2
-
-> **Status: under development** — v2 is a full rewrite, not production-ready yet.
+# amex-actual-importer
 
 Syncs American Express Italia transactions to [Actual Budget](https://actualbudget.org/) via `@actual-app/api`. Authenticates with MFA (OTP via email), runs as a daily systemd timer on a VPS.
 
-**Note:** v2 uses reverse-engineered AMEX web APIs.
+**Note:** v2 uses reverse-engineered AMEX web APIs — see [REV_ENG.md](REV_ENG.md) for endpoint reference.
 
 ## Requirements
 

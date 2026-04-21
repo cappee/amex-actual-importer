@@ -2,6 +2,11 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { encrypt } from '../src/lib/crypto.js';
 
+// Trigger `import 'dotenv/config'` (side-effect inside the config module)
+// once now, so subsequent clearEnv() calls aren't undone by dotenv
+// repopulating process.env on the first dynamic import inside a test.
+await import('../src/config/index.js');
+
 const PASSPHRASE = 'test-encryption-key-32char!!!!!x';
 
 function setEnvDefaults(): void {
